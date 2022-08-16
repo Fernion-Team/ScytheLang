@@ -85,13 +85,15 @@ namespace Scythe.Nodes
         public BlockStatement body;
         public Token name;
         public Token type;
+        public bool isVAARG;
 
-        public FunctionStatement(Punctuated<(Token Ident, Token Colon, Token Type), Token> parameters, BlockStatement body, Token name, Token type)
+        public FunctionStatement(Punctuated<(Token Ident, Token Colon, Token Type), Token> parameters, BlockStatement body, Token name, Token type, bool isvAARG)
         {
             this.parameters = parameters;
             this.body = body;
             this.name = name;
             this.type = type;
+            this.isVAARG = isvAARG;
         }
     }
 
@@ -155,6 +157,20 @@ namespace Scythe.Nodes
         }
     }
 
+    public class StrMSetStatement : Statement
+    {
+        public Expression a;
+        public Token b;
+        public Expression c;
+
+        public StrMSetStatement(Expression a, Token b, Expression c)
+        {
+            this.a = a;
+            this.b = b;
+            this.c = c;
+        }
+    }
+
     public class ReturnStatement : Statement
     {
         public Expression value;
@@ -162,6 +178,18 @@ namespace Scythe.Nodes
         public ReturnStatement(Expression value)
         {
             this.value = value;
+        }
+    }
+
+    public class StructStatement : Statement
+    {
+        public Punctuated<(Token Ident, Token Colon, Token Type), Token> Variables;
+        public Token name;
+
+        public StructStatement(Token _name, Punctuated<(Token Ident, Token Colon, Token Type), Token> variables)
+        {
+            Variables = variables;
+            name = _name;
         }
     }
     #endregion

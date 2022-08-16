@@ -21,7 +21,14 @@ namespace Scythe
         public static unsafe string SByteToStr(sbyte* str)
         {
             string ptr = Marshal.PtrToStringUTF8((IntPtr)str);
-           
+
+            return ptr;
+        }
+
+        public static unsafe string SByteToStrA(sbyte* str)
+        {
+            string ptr = Marshal.PtrToStringAnsi((IntPtr)str);
+
             return ptr;
         }
 

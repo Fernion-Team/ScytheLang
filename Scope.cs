@@ -30,6 +30,18 @@ namespace Scythe
             return null;
         }
 
+        public void Insert(Symbol sym)
+        {
+            if(Lookup(sym.name) == null)
+            {
+                symbols.Add(sym.name, sym);
+            }
+            else
+            {
+                Console.WriteLine("Symbol " + sym.name + " is already defined.");
+            }
+        }
+
         public Scope(ScopeKind kind)
         {
             this.kind = kind;

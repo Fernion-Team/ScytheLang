@@ -77,8 +77,16 @@ partial class Program
                             LLVM.InitializeWebAssemblyAsmPrinter();
                             fileName = "out/" + extraOptions[1] + ".wasm";
                         }
+                        else
+                        {
+                            LLVM.InitializeAllTargetInfos();
+                            LLVM.InitializeAllTargets();
+                            LLVM.InitializeAllTargetMCs();
+                            LLVM.InitializeAllAsmParsers();
+                            LLVM.InitializeAllAsmPrinters();
+                        }
 
-                        if(extraOptions.Contains("--nat"))
+                        if (extraOptions.Contains("--nat"))
                         {
                             LLVM.InitializeAllTargetInfos();
                             LLVM.InitializeAllTargets();
@@ -87,14 +95,7 @@ partial class Program
                             LLVM.InitializeAllAsmPrinters();
                         }
                     }
-                    else
-                    {
-                        LLVM.InitializeAllTargetInfos();
-                        LLVM.InitializeAllTargets();
-                        LLVM.InitializeAllTargetMCs();
-                        LLVM.InitializeAllAsmParsers();
-                        LLVM.InitializeAllAsmPrinters();
-                    }
+                    
 
                     fileName = "out/" + extraOptions[1] + ".o";
                     Directory.CreateDirectory("out");
@@ -152,16 +153,20 @@ partial class Program
 
                     LLVMCodeGenFileType flType = LLVMCodeGenFileType.LLVMObjectFile;
 
+                    
+                    
+
 
                     if (JIT)
                     {
                         sbyte* err;
-                        var execJIT = module.CreateMCJITCompiler();                      
+                        var execJIT = module.CreateMCJITCompiler();
                         var mainFn = execJIT.FindFunction("main");
                         LLVM.ExecutionEngineGetErrMsg(execJIT, &err);
                         if(err != null)
                             Console.WriteLine("[FATAL][JIT]: " + Helpers.SByteToStr(err));
                         execJIT.RunFunction(mainFn, new LLVMGenericValueRef[] { });
+
                     }
 
                     else if(Intrp)
@@ -173,17 +178,42 @@ partial class Program
                         if (err != null)
                             Console.WriteLine("[FATAL][INTERPRETER]: " + Helpers.SByteToStr(err));
                         execINT.RunFunction(mainFn, new LLVMGenericValueRef[] { });
+
+                        
                     }
 
                     else
                     {
-                        module.PrintToFile("out/" + extraOptions[1] + ".ll");
+                        module.Dump();
+
+                        sbyte* error;
+
+                        LLVM.TargetMachineEmitToFile(tm, module, Helpers.StrToSByte("out/" + extraOptions[1] + ".o"), flType, &error);
+
+                        System.Diagnostics.ProcessStartInfo info = new System.Diagnostics.ProcessStartInfo();
+
+                        info.Arguments = "out/" + extraOptions[1] + ".o -o " + "out/" + extraOptions[1] + ".exe";
+                        info.CreateNoWindow = true;
+                        info.FileName = "clang";
+
+                        System.Diagnostics.Process.Start(info);
+
+                        //module.PrintToFile("out/" + extraOptions[1] + ".ll");
                     }
 
                     
 
                     Console.WriteLine("\nDone in " + (DateTime.Now - xz).TotalMilliseconds + " ms.");
                 }
+            }
+            else
+            {
+                var err = program.Error;
+                foreach (var element in err.Elements.Values)
+                {
+                    Console.WriteLine($"  expected {string.Join(" or ", element.Expected)} while parsing {element.Context}");
+                }
+                Console.WriteLine($"  but got {(err.Got == null ? "end of input" : err.Got)}");
             }
         }
         if(option == "new")

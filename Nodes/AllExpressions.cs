@@ -49,6 +49,27 @@ namespace Scythe.Nodes
         }
     }
 
+    public class NewObjectExpression : Expression
+    {
+        public Token structName;
+
+        public NewObjectExpression(Token structName)
+        {
+            this.structName = structName;
+        }
+    }
+    public class StructMVExpr : Expression
+    {
+        public Token structName;
+        public Token mvName;
+
+        public StructMVExpr(Token name, Token mvname)
+        {
+            this.structName = name;
+            this.mvName = mvname;
+        }
+    }
+
     public class IntLiteralExpr : Expression
     {
         public Token literal;

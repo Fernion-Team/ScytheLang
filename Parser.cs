@@ -15,11 +15,13 @@ namespace Scythe
     [Parser(typeof(TokenType))]
     public partial class Parser
     {
-        [Rule("program: stmt*")]
-        private static IReadOnlyList<Statement> ProgramParse(IReadOnlyList<Statement> parsed)
+        [Rule("program: stmt* tok_end")]
+        private static IReadOnlyList<Statement> ProgramParse(IReadOnlyList<Statement> parsed, Token end)
         {
             return parsed;
         }
+
+       
 
         [Rule("stmt: kw_Package bas_rightlook lit_String")]
         private static Statement DeclarePackage(Token notneeded, Token notneeded2, Token name)
@@ -57,13 +59,24 @@ namespace Scythe
             return new ExpressionStatement(expr);
         }
 
-        [Rule("stmt: kw_Function identifier '(' ((identifier ':' type_identifier) (',' (identifier ':' type_identifier))*)? ')' bas_rightlook type_identifier block_stmt")]
-        private static Statement FunctionDeclaration(Token _1, Token name, Token _3, Punctuated<(Token Ident, Token Colon, Token Type), Token> parameters, Token _4, Token _5, Token type, BlockStatement body)
+        [Rule("stmt: kw_Function identifier '(' ((identifier ':' type_identifier) (',' (identifier ':' type_identifier))*)? (',' elp_vaa)? ')' bas_rightlook type_identifier block_stmt")]
+        private static Statement FunctionDeclaration(Token _1, Token name, Token _3, Punctuated<(Token Ident, Token Colon, Token Type), Token> parameters, (Token, Token)? vaarg, Token _4, Token _5, Token type, BlockStatement body)
         {
-            return new FunctionStatement(parameters, body, name, type);
+            bool isvarg = false;
+
+            if (vaarg.HasValue)
+                isvarg = true;
+
+            return new FunctionStatement(parameters, body, name, type, isvarg);
         }
 
-        [Rule("stmt: kw_Var identifier bas_leftlook expr ':' type_identifier")]
+        [Rule("stmt: identifier bas_rightlook kw_Struct '{' ((identifier ':' type_identifier) (',' (identifier ':' type_identifier))*)? '}'")]
+        private static Statement StructDecl(Token name, Token _1, Token _2, Token _3, Punctuated<(Token Ident, Token Colon, Token Type), Token> values, Token _4)
+        {
+            return new StructStatement(name, values);
+        }
+
+        [Rule("stmt: kw_Var identifier bas_leftlook expr ':' identifier")]
         private static Statement VarDeclaration(Token _1, Token name, Token _2, Expression value, Token _3, Token type)
         {
             return new VariableDeclStatement(name, value, type);
@@ -86,8 +99,13 @@ namespace Scythe
         {
             return new VariableSetStatement(a, b);
         }
-        
-        
+
+        [Rule("stmt: expr bas_dot identifier bas_leftlook expr")]
+        private static Statement SetStructElement(Expression a, Token _1, Token b, Token _2, Expression c)
+        {
+            return new StrMSetStatement(a, b, c);
+        }
+
         [Rule("stmt: kw_Extern kw_Function identifier '(' ((identifier ':' type_identifier) (',' (identifier ':' type_identifier))*)? ')' bas_rightlook type_identifier")]
         private static Statement ExtFunctionDeclaration(Token _0, Token _1, Token name, Token _3, Punctuated<(Token Ident, Token Colon, Token Type), Token> parameters, Token _4, Token _5, Token type)
         {
@@ -137,12 +155,25 @@ namespace Scythe
         {
             return new VariableExpr(varf);
         }
+
+        [Rule("expr: identifier bas_rightlook identifier")]
+        public static Expression StrMVExpr(Token obj, Token _1, Token mvName)
+        {
+            return new StructMVExpr(obj, mvName);
+        }
+
         [Rule("expr: lit_Float")]
         public static Expression FloatLiteral(Token literal)
         {
             return new FloatLiteralExpr(literal);
         }
 
-   
+        [Rule("expr: identifier bas_dot kw_New")]
+        public static Expression CreateStructObject(Token strName, Token _1, Token _2)
+        {
+            return new NewObjectExpression(strName);
+        }
+
+        
     }
 }

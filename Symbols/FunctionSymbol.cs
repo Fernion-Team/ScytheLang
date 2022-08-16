@@ -13,7 +13,8 @@ namespace Scythe.Symbols
         Uint,
         Bool,
         String,
-        Void
+        Void,
+        Struct
     }
 
     public class FunctionSymbol : Symbol
@@ -22,6 +23,7 @@ namespace Scythe.Symbols
         //public Nodes.BlockStatement Body;
 
         public DataType returnType;
+        public string _retType;
 
         public unsafe FunctionSymbol(string name, DataType returnType)
         {

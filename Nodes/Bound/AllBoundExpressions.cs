@@ -62,6 +62,16 @@ namespace Scythe.Nodes.Bound
         }
     }
 
+    public class BoundNewObjectExpression : BoundExpression
+    {
+        public string structName;
+
+        public BoundNewObjectExpression(string structName)
+        {
+            this.structName = structName;
+        }
+    }
+
     public class BoundIntLiteralExpr : BoundExpression
     {
         public int Literal;
@@ -79,6 +89,18 @@ namespace Scythe.Nodes.Bound
         public BoundFloatLiteralExpr(float literal)
         {
             Literal = literal;
+        }
+    }
+
+    public class BoundStructMVExpr : BoundExpression
+    {
+        public string strName;
+        public string mvName;
+
+        public BoundStructMVExpr(string strName, string mvName)
+        {
+            this.strName = strName;
+            this.mvName = mvName;
         }
     }
 

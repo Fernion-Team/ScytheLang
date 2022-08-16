@@ -8,6 +8,9 @@ using Yoakke.SynKit.Lexer.Attributes;
 
 namespace Scythe
 {
+    /// <summary>
+    /// Class for Token Types.
+    /// </summary>
     public enum TokenType
     {
         // Text Analysis Tokens. (tok_x)
@@ -28,8 +31,10 @@ namespace Scythe
         [Token("char")] kw_Char,
         [Token("uint")] kw_Uint,
         [Token("void")] kw_Void,
+        [Token("struct")] kw_Struct,
         [Token("asm")] kw_Asm,
         [Token("extern")] kw_Extern,
+        [Token("new")] kw_New,
         [Token("if")] kw_If,
         [Token("package")] kw_Package,
 
@@ -65,8 +70,12 @@ namespace Scythe
         // Basic Operators: (bas_x)
         [Token("<-")] bas_leftlook,
         [Token("->")] bas_rightlook,
+        [Token(".")] bas_dot,
         [Token(":")] bas_colon,
         [Token("$")] bas_arrdecl,
+
+        // Elipsis Tokens: (elp_x)
+        [Token("...")] elp_vaa,
 
         // Other Stuff: (x)
         [Regex(Regexes.Identifier)] identifier,

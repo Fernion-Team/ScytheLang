@@ -30,6 +30,7 @@ namespace Scythe
     {
         public List<Scope> Scopes = new List<Scope>();
         public Scope currentScope { get; set; }
+        public Scope global = new Scope(ScopeKind.Global);
 
         public DataType? DecideType(string type)
         {
@@ -50,7 +51,14 @@ namespace Scythe
                 case "void":
                     return DataType.Void;
                 default:
-                    throw new InvalidDataException("This type '" + type + "' does not exist, sorry!");
+                    if(global.Lookup(type).GetType() == typeof(StructSymbol))
+                    {
+                        return DataType.Struct;
+                    }
+                    else
+                    {
+                        throw new Exception("This type " + type + " does not exist!");
+                    }
             }
         }
 
@@ -116,6 +124,10 @@ namespace Scythe
                 case StringLiteralExpr:
                     var strlit = expr as StringLiteralExpr;
                     return new BoundStringLiteralExpr(strlit.literal.Text.Replace("\"",""));
+                case StructMVExpr:
+                    return new BoundStructMVExpr((expr as StructMVExpr).structName.Text, (expr as StructMVExpr).mvName.Text);
+                case NewObjectExpression:
+                    return new BoundNewObjectExpression((expr as NewObjectExpression).structName.Text);
             }
             throw new InvalidDataException($"Expression of type {expr.GetType().Name} could not be binded to! (It is invalid.)");
         }
@@ -133,13 +145,30 @@ namespace Scythe
             var parameters = new List<Parameter>();
             foreach(var p in prms)
             {
-                parameters.Add(new Parameter(DecideType(p.Value.Type.Text).Value, p.Value.Ident.Text));
+                var pr = new Parameter(DecideType(p.Value.Type.Text).Value, p.Value.Ident.Text);
+                pr._type = p.Value.Type.Text;
+                parameters.Add(pr);
             }
             return parameters;
         }
+
+        public List<MemberVariable> BindMemberVars(Punctuated<(Token Ident, Token Colon, Token Type), Token> mv)
+        {
+            var mvs = new List<MemberVariable>();
+            foreach (var m in mv)
+            {
+                var _m = new MemberVariable(DecideType(m.Value.Type.Text).Value, m.Value.Ident.Text);
+                _m._type = m.Value.Type.Text;
+                mvs.Add(_m);
+            }
+            return mvs;
+        }
+
         public List<BoundStatement> Bind(List<Statement> statements)
         {
             var allStmts = new List<BoundStatement>();
+            Scopes.Add(global); // Implement the global scope.
+            currentScope = global;
             foreach(var x in statements)
             {
                 switch(x)
@@ -157,13 +186,20 @@ namespace Scythe
                         allStmts.Add(new BoundExpressionStatement(BindExpression((x as ExpressionStatement).Expression)));
                         break;
                     case FunctionStatement:
-                        allStmts.Add(new BoundFunctionStatement(BindParams((x as FunctionStatement).parameters), (x as FunctionStatement).name.Text, DecideType((x as FunctionStatement).type.Text).Value, new BoundBlockStatement(Bind((x as FunctionStatement).body.statements.ToList()))));
+                        var fncSt = new BoundFunctionStatement(BindParams((x as FunctionStatement).parameters), (x as FunctionStatement).name.Text, DecideType((x as FunctionStatement).type.Text).Value, new BoundBlockStatement(Bind((x as FunctionStatement).body.statements.ToList())), (x as FunctionStatement).isVAARG);
+                        fncSt._type = (x as FunctionStatement).type.Text;
+                        allStmts.Add(fncSt);
+                        var fnsy = new FunctionSymbol(fncSt.Name, fncSt.Type);
+                        fnsy._retType = (x as FunctionStatement).type.Text;
+                        currentScope.Insert(fnsy);
                         break;
                     case ReturnStatement:
                         allStmts.Add(new BoundReturnStatement(BindExpression((x as ReturnStatement).value)));
                         break;
                     case VariableDeclStatement:
-                        allStmts.Add(new BoundVariableDeclStatement((x as VariableDeclStatement).name.Text, DecideType((x as VariableDeclStatement).type.Text).Value, BindExpression((x as VariableDeclStatement).value)));
+                        var vds = new BoundVariableDeclStatement((x as VariableDeclStatement).name.Text, DecideType((x as VariableDeclStatement).type.Text).Value, BindExpression((x as VariableDeclStatement).value));
+                        vds._type = (x as VariableDeclStatement).type.Text;
+                        allStmts.Add(vds);
                         break;
                     case InlineAsmStatement:
                         allStmts.Add(new BoundInlineAsmStatement(BindExpression((x as InlineAsmStatement).asm)));
@@ -179,6 +215,17 @@ namespace Scythe
                         break;
                     case IfStatement:
                         allStmts.Add(new BoundIfStatement(BindExpression((x as IfStatement).condition), new BoundBlockStatement(Bind((x as IfStatement).conditionBlock.statements.ToList()))));
+                        break;
+                    case StructStatement:
+                        var nstmt = new BoundStructStatement((x as StructStatement).name.Text, BindMemberVars((x as StructStatement).Variables));
+                        allStmts.Add(nstmt);
+                        if (global.Lookup(nstmt.Name) == null)
+                        {
+                            global.symbols.Add(nstmt.Name, new StructSymbol(nstmt.Name, nstmt.Variables));
+                        }
+                        break;
+                    case StrMSetStatement:
+                        allStmts.Add(new BoundStrMSetStatement(BindExpression((x as StrMSetStatement).a), (x as StrMSetStatement).b.Text, BindExpression((x as StrMSetStatement).c)));
                         break;
                 }
             }

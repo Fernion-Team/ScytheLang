@@ -1,0 +1,17 @@
+﻿testStruct -> struct
+{
+	test: int,
+	test2: string
+}
+
+fn main() -> int
+{
+	var x <- testStruct.new : testStruct
+
+	x.test <- 5
+	x.test2 <- "Hello, world!"
+
+	print(x->test2);
+
+	return 1;
+}

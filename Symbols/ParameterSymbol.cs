@@ -10,5 +10,6 @@ namespace Scythe.Symbols
     {
         public string Name = "";
         public DataType type;
+        public string _type;
     }
 }
