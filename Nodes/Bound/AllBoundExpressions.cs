@@ -114,5 +114,15 @@ namespace Scythe.Nodes.Bound
         }
     }
 
+    public class BoundPointerExpr : BoundExpression
+    {
+        public BoundExpression expr;
+
+        public BoundPointerExpr(BoundExpression expr)
+        {
+            this.expr = expr;
+        }
+    }
+
     #endregion      
 }

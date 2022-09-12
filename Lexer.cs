@@ -23,19 +23,15 @@ namespace Scythe
         [Token("fn")] kw_Function,
         [Token("use")] kw_Use,
         [Token("return")] kw_Return,
-        [Token("int")] kw_Int,
         [Token("var")] kw_Var,
-        [Token("string")] kw_String,
-        [Token("bool")] kw_Bool,
-        [Token("float")] kw_Float,
-        [Token("char")] kw_Char,
-        [Token("uint")] kw_Uint,
-        [Token("void")] kw_Void,
         [Token("struct")] kw_Struct,
         [Token("asm")] kw_Asm,
         [Token("extern")] kw_Extern,
         [Token("new")] kw_New,
         [Token("if")] kw_If,
+        [Token("true")] kw_True,
+        [Token("false")] kw_False,
+        [Token("while")] kw_While,
         [Token("package")] kw_Package,
 
         // Literal Tokens. (lit_x)
@@ -76,6 +72,9 @@ namespace Scythe
 
         // Elipsis Tokens: (elp_x)
         [Token("...")] elp_vaa,
+
+        // Tags: (tag_x)
+        [Token("#dllImport")] tag_dllImport,
 
         // Other Stuff: (x)
         [Regex(Regexes.Identifier)] identifier,

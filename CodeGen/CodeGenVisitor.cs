@@ -21,6 +21,8 @@ namespace Scythe.CodeGen
 
         private readonly Dictionary<string, Pointer<LLVMOpaqueValue>> namedValues = new Dictionary<string, Pointer<LLVMOpaqueValue>>();
 
+        private readonly Dictionary<string, Pointer<LLVMOpaqueValue>> varAllocaValues = new Dictionary<string, Pointer<LLVMOpaqueValue>>();
+
         private readonly Dictionary<string, Pointer<LLVMOpaqueType>> strObjTypes = new Dictionary<string, Pointer<LLVMOpaqueType>>();
 
         private readonly Dictionary<string, Pointer<LLVMOpaqueType>> structTypes = new Dictionary<string, Pointer<LLVMOpaqueType>>();
@@ -38,11 +40,6 @@ namespace Scythe.CodeGen
             this.symbolTable = symbolTable;
             this.FPM = module.CreateFunctionPassManager();
 
-            FPM.AddInstructionCombiningPass();
-            FPM.AddReassociatePass();
-            FPM.AddGVNPass();
-            FPM.AddCFGSimplificationPass();
-
             FPM.InitializeFunctionPassManager();
         }
 
@@ -58,6 +55,7 @@ namespace Scythe.CodeGen
             BoundStringLiteralExpr => VisitStringLiteral(expr as BoundStringLiteralExpr),
             BoundStructMVExpr => VisitStructMVExpr(expr as BoundStructMVExpr),
             BoundNewObjectExpression => VisitNewObj(expr as BoundNewObjectExpression),
+            BoundPointerExpr => VisitValuePointer(expr as BoundPointerExpr),
             _ => throw new Exception("[FATAL]: Expression that was attempted to be visited is invalid/unknown. '" + expr + "'."),
         };
 
@@ -75,6 +73,7 @@ namespace Scythe.CodeGen
             BoundIfStatement => this.VisitIfStmt(stmt as BoundIfStatement),
             BoundStructStatement => this.VisitStructStmt(stmt as BoundStructStatement),
             BoundStrMSetStatement => this.VisitStrM(stmt as BoundStrMSetStatement),
+            BoundWhileStatement => this.VisitWhileStmt(stmt as BoundWhileStatement),
             _ => throw new Exception("[FATAL]: Statement that was attempted to be visited is invalid/unknown. '"+stmt+"'."),
         };
 
@@ -144,12 +143,15 @@ namespace Scythe.CodeGen
             return stmt;
         }
 
-        public BoundStatement VisitVarSet(BoundVariableSetStatement stmt)
+        public unsafe BoundStatement VisitVarSet(BoundVariableSetStatement stmt)
         {
             if(namedValues.ContainsKey(stmt.a))
             {
                 this.Visit(stmt.b);
-                namedValues[stmt.a] = valueStack.Pop();
+                var x = valueStack.Pop();
+                namedValues[stmt.a] = x;
+
+                LLVM.BuildStore(builder, x, varAllocaValues[stmt.a]);
             }
             else
             {
@@ -178,6 +180,17 @@ namespace Scythe.CodeGen
             return expr;
         }
 
+        public unsafe BoundExpression VisitValuePointer(BoundPointerExpr expr)
+        {
+            this.Visit(expr.expr);
+
+            var val = valueStack.Pop();
+    
+            valueStack.Push(LLVM.BuildLoad2(builder, LLVM.PointerType(LLVM.TypeOf(val), 0), val, StrToSByte("ix_drp")));
+
+            return expr;
+        }
+
         public unsafe BoundExpression VisitStringLiteral(BoundStringLiteralExpr expr)
         {
 
@@ -195,7 +208,10 @@ namespace Scythe.CodeGen
 
             if (namedValues.TryGetValue(expr.Name, out value))
             {
-                valueStack.Push(value);
+                if (varAllocaValues.ContainsKey(expr.Name))
+                    valueStack.Push(LLVM.BuildLoad(builder, varAllocaValues[expr.Name], StrToSByte("load_var_" + expr.Name)));
+                else
+                    valueStack.Push(value);
             }
             else
             {
@@ -278,6 +294,11 @@ namespace Scythe.CodeGen
             _ => throw new Exception("Unknown Operator.")
         };
 
+        // make an operating system kernel in C#
+        
+       
+        
+
         public unsafe BoundStatement VisitIfStmt(BoundIfStatement stmt)
         {
             BoundBinaryExpr cond = stmt.cond as BoundBinaryExpr;
@@ -294,22 +315,68 @@ namespace Scythe.CodeGen
             var func = LLVM.GetBasicBlockParent(LLVM.GetInsertBlock(builder));
 
             LLVMOpaqueBasicBlock* thenBB = LLVM.AppendBasicBlock(func, Helpers.StrToSByte("then"));
-            LLVMOpaqueBasicBlock* elseBB = LLVM.AppendBasicBlock(func, Helpers.StrToSByte("else"));
             LLVMOpaqueBasicBlock* mergeBB = LLVM.AppendBasicBlock(func, Helpers.StrToSByte("ifcont"));
 
             LLVM.BuildCondBr(builder, val, thenBB, mergeBB);
 
-            LLVM.PositionBuilderAtEnd(builder, elseBB);
-
-            LLVM.BuildBr(builder, mergeBB);
-
             LLVM.PositionBuilderAtEnd(builder, thenBB);
+
+            try
+            {
+                foreach (var x in stmt.body.Body)
+                    this.Visit(x);
+            }
+            catch
+            {
+                Console.WriteLine("Error Writing Then Label.");
+            }
 
             LLVM.BuildBr(builder, mergeBB);
 
             LLVM.PositionBuilderAtEnd(this.builder, mergeBB);
 
+            return stmt;
+        }
 
+        public unsafe BoundStatement VisitWhileStmt(BoundWhileStatement stmt)
+        {
+                BoundBinaryExpr cond = stmt.cond as BoundBinaryExpr;
+
+   
+
+            var func = LLVM.GetBasicBlockParent(LLVM.GetInsertBlock(builder));
+
+            LLVMOpaqueBasicBlock* whileBB = LLVM.AppendBasicBlock(func, Helpers.StrToSByte("whilecondt"));
+            LLVMOpaqueBasicBlock* trueBB = LLVM.AppendBasicBlock(func, Helpers.StrToSByte("condtrue"));
+            LLVMOpaqueBasicBlock* mergeBB = LLVM.AppendBasicBlock(func, Helpers.StrToSByte("whilecont"));
+
+            LLVM.BuildBr(builder, whileBB);
+
+            LLVM.PositionBuilderAtEnd(builder, whileBB);
+
+            this.Visit(cond.a); this.Visit(cond.b);
+            
+            LLVMOpaqueValue* r = valueStack.Pop();
+            LLVMOpaqueValue* l = valueStack.Pop();
+
+            var _val = LLVM.BuildICmp(builder, CDTOperator(cond.op), l, r, Helpers.StrToSByte("whilecond"));
+            LLVM.BuildCondBr(builder, _val, trueBB, mergeBB);
+
+            LLVM.PositionBuilderAtEnd(builder, trueBB);
+
+            try
+            {
+                foreach (var x in stmt.body.Body)
+                    this.Visit(x);
+            }
+            catch
+            {
+                Console.WriteLine("Error Writing True(while) Label.");
+            }
+
+            LLVM.BuildBr(builder, whileBB);
+
+            LLVM.PositionBuilderAtEnd(this.builder, mergeBB);
 
             return stmt;
         }
@@ -343,81 +410,48 @@ namespace Scythe.CodeGen
 
         public unsafe LLVMOpaqueType* ParameterType(Parameter mtr)
         {
-            switch(mtr.DataType)
-            {
-                case DataType.Bool:
-                    return LLVM.Int1Type();
-                case DataType.Int:
-                    return LLVM.Int32Type();
-                case DataType.Float:
-                    return LLVM.FloatType();
-                case DataType.String:
-                    return LLVM.PointerType(LLVM.Int8Type(), 0);
-                case DataType.Struct:
-                    if (symbolTable.ContainsKey(mtr._type))
-                    {
-                        Console.WriteLine("Contains.");
-                        Console.WriteLine("Key: " + mtr._type);
-                        return structTypes[mtr._type];
-                    }
-                    else
-                    {
-                        throw new Exception("Invalid/Unknown Struct Type.");
-                    }
-            }
-            return LLVM.Int32Type();
+            return UnwrapType(mtr.DataType);
         }
 
+        public unsafe LLVMOpaqueType* UnwrapType(BoundType type)
+        {
+            if (type is BoundIdentifierType)
+            {
+                var ty = type as BoundIdentifierType;
+                switch (ty.Type)
+                {
+                    case DataType.Int:
+                        return LLVM.Int32Type();
+                    case DataType.Float:
+                        return LLVM.FloatType();
+                    case DataType.Uint:
+                        return LLVM.Int32Type();
+                    case DataType.Bool:
+                        return LLVM.Int1Type();
+                    case DataType.String:
+                        return LLVM.PointerType(LLVM.Int8Type(), 0);
+                    case DataType.Void:
+                        return LLVM.VoidType();
+                    case DataType.Struct:
+                        if (symbolTable.ContainsKey(ty.Name))
+                        {
+                            return structTypes[ty.Name];
+                        }
+                        else
+                            throw new Exception("Unknown/Invalid Struct Typename.");
+                }
+            }
+            else if (type is BoundPointerType)
+            {
+                return LLVM.PointerType(UnwrapType((type as BoundPointerType).Type), 0);
+            }
+
+            return LLVM.Int32Type();
+        }
+        
         public unsafe LLVMOpaqueType* MVarType(MemberVariable mtr)
         {
-            switch (mtr.DataType)
-            {
-                case DataType.Bool:
-                    return LLVM.Int1Type();
-                case DataType.Int:
-                    return LLVM.Int32Type();
-                case DataType.Float:
-                    return LLVM.FloatType();
-                case DataType.String:
-                    return LLVM.PointerType(LLVM.Int8Type(), 0);
-                case DataType.Struct:
-                    if (symbolTable.ContainsKey(mtr._type))
-                    {
-                        return structTypes[symbolTable[mtr._type].name];
-                    }
-                    else
-                    {
-                        throw new Exception("Invalid/Unknown Struct Type.");
-                    }
-            }
-            return LLVM.Int32Type();
-        }
-
-        public unsafe LLVMOpaqueType* DataTyToType(DataType mtr, string _type = "")
-        {
-            switch (mtr)
-            {
-                case DataType.Bool:
-                    return LLVM.Int1Type();
-                case DataType.Int:
-                    return LLVM.Int32Type();
-                case DataType.Float:
-                    return LLVM.FloatType();
-                case DataType.String:
-                    return LLVM.PointerType(LLVM.Int8Type(), 0);
-                case DataType.Void:
-                    return LLVM.VoidType();
-                case DataType.Struct:
-                    if (symbolTable.ContainsKey(_type))
-                    {
-                        return structTypes[_type];
-                    }
-                    else
-                    {
-                        throw new Exception("Invalid/Unknown Struct Type.");
-                    }
-            }
-            return LLVM.VoidType();
+            return UnwrapType(mtr.DataType);
         }
 
         public unsafe LLVMOpaqueType*[] ParameterTypes(List<Parameter> mtrs)
@@ -485,22 +519,13 @@ namespace Scythe.CodeGen
             return stmt;
         }
 
-        // to-do: fix struct-type issue here.
+        /// <summary>
+        /// Deprecated.
+        /// </summary>
+        /// <param name="stmt"></param>
+        /// <returns></returns>
         public unsafe BoundStatement VisitFunctionExtern(BoundExternFunctionStatement stmt)
         {
-            var mod = builder.InsertBlock.Parent.GlobalParent;
-            LLVMOpaqueValue* callee;
-            var namedF = mod.GetNamedFunction(stmt.Name);
-            if (namedF != null)
-            {
-                callee = namedF;
-            }
-            else
-            {
-
-                fixed (LLVMOpaqueType** pptr = ParameterTypes(stmt.Parameters))
-                    LLVM.AddFunction(mod, StrToSByte(stmt.Name), LLVM.FunctionType(DataTyToType(stmt.Type), pptr, (uint)stmt.Parameters.Count, 1));
-            }
             return stmt;
         }
 
@@ -508,11 +533,12 @@ namespace Scythe.CodeGen
         {
             var callee = LLVM.GetNamedFunction(module, StrToSByte(expr.Name));
             var mod = builder.InsertBlock.Parent.GlobalParent;
-            if((IntPtr)callee == IntPtr.Zero)
+
+            if ((IntPtr)callee == IntPtr.Zero)
             {
                 // namedValues.Add(expr.Name, LLVM.AddFunction(module, StrToSByte(expr.Name), DataTyToType((symbolTable[expr.Name] as FunctionSymbol).returnType)));
                 //valueStack.Push(LLVM.ConstInt(LLVM.Int32Type(), 0, 1));
-                if(expr.Name == "print")
+                if (expr.Name == "print")
                 {
                     var namedF = mod.GetNamedFunction("printf");
                     if (namedF != null)
@@ -521,15 +547,16 @@ namespace Scythe.CodeGen
                     }
                     else
                     {
+
                         fixed (LLVMOpaqueType** pptr = new LLVMOpaqueType*[] { LLVM.PointerType(LLVM.Int8Type(), 0) })
                             callee = LLVM.AddFunction(mod, StrToSByte("printf"), LLVM.FunctionType(LLVM.Int32Type(), pptr, 1, 1));
                     }
                 }
             }
 
-            
-
-            if(LLVM.CountParams(callee) != expr.Arguments.Count && LLVM.IsFunctionVarArg(LLVM.TypeOf(callee)) == 1)
+            //Console.WriteLine("Calling: " + expr.Name);
+            //module.Dump();
+            if (LLVM.CountParams(callee) != expr.Arguments.Count)
             {
                 throw new Exception("Incorrect number of arguments passed.");
             }
@@ -545,10 +572,7 @@ namespace Scythe.CodeGen
 
             fixed (LLVMOpaqueValue** pptr = argsV)
             {
-             
-                    valueStack.Push(LLVM.BuildCall(builder, callee, pptr, argCount, StrToSByte("CallTMP")));
-                 
-                
+                valueStack.Push(LLVM.BuildCall(builder, callee, pptr, argCount, StrToSByte("CallTMP")));
             }
 
             return expr;
@@ -580,8 +604,11 @@ namespace Scythe.CodeGen
             this.Visit(stmt.Expr);
             var x = valueStack.Pop();
 
-            if (LLVM.TypeOf(x.Value) == LLVM.Int32Type() && stmt.Type == DataType.Float)
-                LLVM.BuildCast(builder, LLVMOpcode.LLVMSIToFP, x.Value, DataTyToType(stmt.Type), StrToSByte("CastSIFP"));
+            /*if (LLVM.TypeOf(x.Value) == LLVM.Int32Type() && stmt.Type == DataType.Float)
+                LLVM.BuildCast(builder, LLVMOpcode.LLVMSIToFP, x.Value, DataTyToType(stmt.Type), StrToSByte("CastSIFP"));*/
+
+            // add integer casting(only).
+            
             return stmt;
         }
 
@@ -621,9 +648,9 @@ namespace Scythe.CodeGen
                 fixed (LLVMOpaqueType** pptr = ParameterTypes(node.Parameters))
                 {
                     if(node.isVAARG != true)
-                        function = LLVM.AddFunction(this.module, StrToSByte(node.Name), LLVM.FunctionType(DataTyToType(node.Type, node._type), pptr, argumentCount, 0));
+                        function = LLVM.AddFunction(this.module, StrToSByte(node.Name), LLVM.FunctionType(UnwrapType(node.Type), pptr, argumentCount, 0));
                     else
-                        function = LLVM.AddFunction(this.module, StrToSByte(node.Name), LLVM.FunctionType(DataTyToType(node.Type, node._type), pptr, argumentCount, 1));
+                        function = LLVM.AddFunction(this.module, StrToSByte(node.Name), LLVM.FunctionType(UnwrapType(node.Type), pptr, argumentCount, 1));
                 }
                 LLVM.SetLinkage(function, LLVMLinkage.LLVMExternalLinkage);
             }
@@ -657,13 +684,16 @@ namespace Scythe.CodeGen
                 throw;
             }
 
-            
+            if(UnwrapType(node.Type) == LLVM.VoidType())
+            {
+                LLVM.BuildRetVoid(builder);
+            }
 
             LLVM.VerifyFunction(function2, LLVMVerifierFailureAction.LLVMPrintMessageAction);
 
             FPM.RunFunctionPassManager(function2);
 
-            this.valueStack.Push(function2);
+            //this.valueStack.Push(function2);
 
             return node;
         }
@@ -674,7 +704,12 @@ namespace Scythe.CodeGen
             this.Visit(stmt.Value);
             var val = valueStack.Pop();
 
-            namedValues.Add(stmt.Name, val);
+            var ptr = LLVM.BuildAlloca(builder, UnwrapType(stmt.Type), Helpers.StrToSByte("var_" + stmt.Name));
+
+            LLVM.BuildStore(builder, val, ptr);
+
+            varAllocaValues.Add(stmt.Name, ptr);
+            namedValues.Add(stmt.Name, val);     
 
             return stmt;
         }

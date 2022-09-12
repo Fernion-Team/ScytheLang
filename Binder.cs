@@ -121,6 +121,8 @@ namespace Scythe
                 case FloatLiteralExpr:
                     var Floatlit = expr as FloatLiteralExpr;
                     return new BoundFloatLiteralExpr(float.Parse(Floatlit.literal.Text));
+                case BoolLiteralExpr:
+                    return new BoundIntLiteralExpr((expr as BoolLiteralExpr).literal.Text == "true" ? 1 : 0);
                 case StringLiteralExpr:
                     var strlit = expr as StringLiteralExpr;
                     return new BoundStringLiteralExpr(strlit.literal.Text.Replace("\"",""));
@@ -128,6 +130,8 @@ namespace Scythe
                     return new BoundStructMVExpr((expr as StructMVExpr).structName.Text, (expr as StructMVExpr).mvName.Text);
                 case NewObjectExpression:
                     return new BoundNewObjectExpression((expr as NewObjectExpression).structName.Text);
+                case PointerExpr:
+                    return new BoundPointerExpr(BindExpression((expr as PointerExpr).elem));
             }
             throw new InvalidDataException($"Expression of type {expr.GetType().Name} could not be binded to! (It is invalid.)");
         }
@@ -140,25 +144,43 @@ namespace Scythe
             return x;
         }
 
-        public List<Parameter> BindParams(Punctuated<(Token Ident, Token Colon, Token Type), Token> prms)
+        public BoundType BindType(Scythe.Nodes.Type type)
+        {
+            if (type is IdentifierType)
+            {
+                var x = type as IdentifierType;
+                return new BoundIdentifierType(x.typeToken.Text, DecideType(x.typeToken.Text).Value);
+            }
+            else if (type is PointerType)
+            {
+                var x = type as PointerType;
+                return new BoundPointerType(BindType(x.type));
+            }
+            else
+            {
+                throw new Exception("this isnt supposed to happen, lmao.");
+            }
+        }
+
+        public List<Parameter> BindParams(Punctuated<(Token Ident, Token Colon, Scythe.Nodes.Type Type), Token> prms)
         {
             var parameters = new List<Parameter>();
             foreach(var p in prms)
             {
-                var pr = new Parameter(DecideType(p.Value.Type.Text).Value, p.Value.Ident.Text);
-                pr._type = p.Value.Type.Text;
+                BoundType type = BindType(p.Value.Type);
+
+                var pr = new Parameter(type, p.Value.Ident.Text);
                 parameters.Add(pr);
             }
             return parameters;
         }
 
-        public List<MemberVariable> BindMemberVars(Punctuated<(Token Ident, Token Colon, Token Type), Token> mv)
+        public List<MemberVariable> BindMemberVars(Punctuated<(Token Ident, Token Colon, Scythe.Nodes.Type Type), Token> mv)
         {
             var mvs = new List<MemberVariable>();
             foreach (var m in mv)
             {
-                var _m = new MemberVariable(DecideType(m.Value.Type.Text).Value, m.Value.Ident.Text);
-                _m._type = m.Value.Type.Text;
+                var _m = new MemberVariable(BindType(m.Value.Type), m.Value.Ident.Text);
                 mvs.Add(_m);
             }
             return mvs;
@@ -186,19 +208,14 @@ namespace Scythe
                         allStmts.Add(new BoundExpressionStatement(BindExpression((x as ExpressionStatement).Expression)));
                         break;
                     case FunctionStatement:
-                        var fncSt = new BoundFunctionStatement(BindParams((x as FunctionStatement).parameters), (x as FunctionStatement).name.Text, DecideType((x as FunctionStatement).type.Text).Value, new BoundBlockStatement(Bind((x as FunctionStatement).body.statements.ToList())), (x as FunctionStatement).isVAARG);
-                        fncSt._type = (x as FunctionStatement).type.Text;
+                        var fncSt = new BoundFunctionStatement(BindParams((x as FunctionStatement).parameters), (x as FunctionStatement).name.Text, BindType((x as FunctionStatement).type), new BoundBlockStatement(Bind((x as FunctionStatement).body.statements.ToList())), (x as FunctionStatement).isVAARG);
                         allStmts.Add(fncSt);
-                        var fnsy = new FunctionSymbol(fncSt.Name, fncSt.Type);
-                        fnsy._retType = (x as FunctionStatement).type.Text;
-                        currentScope.Insert(fnsy);
                         break;
                     case ReturnStatement:
                         allStmts.Add(new BoundReturnStatement(BindExpression((x as ReturnStatement).value)));
                         break;
                     case VariableDeclStatement:
-                        var vds = new BoundVariableDeclStatement((x as VariableDeclStatement).name.Text, DecideType((x as VariableDeclStatement).type.Text).Value, BindExpression((x as VariableDeclStatement).value));
-                        vds._type = (x as VariableDeclStatement).type.Text;
+                        var vds = new BoundVariableDeclStatement((x as VariableDeclStatement).name.Text, BindType((x as VariableDeclStatement).type), BindExpression((x as VariableDeclStatement).value));
                         allStmts.Add(vds);
                         break;
                     case InlineAsmStatement:
@@ -207,14 +224,17 @@ namespace Scythe
                     case VariableSetStatement:
                         allStmts.Add(new BoundVariableSetStatement((x as VariableSetStatement).a.Text, BindExpression((x as VariableSetStatement).b)));
                         break;
-                    case ExternFunctionStatement:
+                    /*case ExternFunctionStatement:
                         allStmts.Add(new BoundExternFunctionStatement(BindParams((x as ExternFunctionStatement).parameters), (x as ExternFunctionStatement).name.Text, DecideType((x as ExternFunctionStatement).type.Text).Value));
-                        break;
+                        break;*/
                     case CastStatement:
                         allStmts.Add(new BoundCastStatement(DecideType((x as CastStatement).dataType.Text).Value, BindExpression((x as CastStatement).expression)));
                         break;
                     case IfStatement:
                         allStmts.Add(new BoundIfStatement(BindExpression((x as IfStatement).condition), new BoundBlockStatement(Bind((x as IfStatement).conditionBlock.statements.ToList()))));
+                        break;
+                    case WhileStatement:
+                        allStmts.Add(new BoundWhileStatement(BindExpression((x as WhileStatement).condition), new BoundBlockStatement(Bind((x as WhileStatement).conditionBlock.statements.ToList()))));
                         break;
                     case StructStatement:
                         var nstmt = new BoundStructStatement((x as StructStatement).name.Text, BindMemberVars((x as StructStatement).Variables));

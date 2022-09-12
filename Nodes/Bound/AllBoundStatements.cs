@@ -66,11 +66,10 @@ namespace Scythe.Nodes.Bound
 
     public class Parameter
     {
-        public Scythe.Symbols.DataType DataType;
-        public string _type;
+        public BoundType DataType;
         public string Name;
 
-        public Parameter(DataType dataType, string name)
+        public Parameter(BoundType dataType, string name)
         {
             DataType = dataType;
             Name = name;
@@ -79,11 +78,10 @@ namespace Scythe.Nodes.Bound
 
     public class MemberVariable
     {
-        public Scythe.Symbols.DataType DataType;
+        public BoundType DataType;
         public string Name;
-        public string _type;
 
-        public MemberVariable(DataType dataType, string name)
+        public MemberVariable(BoundType dataType, string name)
         {
             DataType = dataType;
             Name = name;
@@ -94,12 +92,11 @@ namespace Scythe.Nodes.Bound
     {
         public List<Parameter> Parameters;
         public string Name;
-        public Scythe.Symbols.DataType Type;
-        public string _type;
+        public BoundType Type;
         public BoundBlockStatement Body;
         public bool isVAARG;
 
-        public BoundFunctionStatement(List<Parameter> parameters, string name, DataType type, BoundBlockStatement body, bool isvaarg)
+        public BoundFunctionStatement(List<Parameter> parameters, string name, BoundType type, BoundBlockStatement body, bool isvaarg)
         {
             Parameters = parameters;
             Name = name;
@@ -148,11 +145,10 @@ namespace Scythe.Nodes.Bound
     public class BoundVariableDeclStatement : BoundStatement
     {
         public string Name;
-        public DataType Type;
-        public string _type;
+        public BoundType Type;
         public BoundExpression Value;
 
-        public BoundVariableDeclStatement(string name, DataType type, BoundExpression value)
+        public BoundVariableDeclStatement(string name, BoundType type, BoundExpression value)
         {
             Name = name;
             Type = type;
@@ -181,6 +177,59 @@ namespace Scythe.Nodes.Bound
         {
             this.cond = cond;
             this.body = body;
+        }
+    }
+
+    public class BoundWhileStatement : BoundStatement
+    {
+        public BoundExpression cond;
+        public BoundBlockStatement body;
+
+        public BoundWhileStatement(BoundExpression cond, BoundBlockStatement body)
+        {
+            this.cond = cond;
+            this.body = body;
+        }
+    }
+
+    public class BoundIdentifierType : BoundType
+    {
+        public string Name;
+        public Scythe.Symbols.DataType Type;
+        public BoundIdentifierType(string name, Scythe.Symbols.DataType type)
+        {
+            Name = name;
+            Type = type;
+        }
+    }
+    
+    public class BoundPointerType : BoundType
+    {
+        public BoundType Type;
+        public BoundPointerType(BoundType type)
+        {
+            Type = type;
+        }
+    }
+
+    public class BoundType
+    {
+        
+    }
+    
+    public class BoundTaggedFunctionStatement : BoundStatement
+    {
+        public List<Parameter> Parameters;
+        public string Tag;
+        public string Name;
+        public Scythe.Symbols.DataType Type;
+
+        public BoundTaggedFunctionStatement(List<Parameter> parameters, string tag, string name, DataType type)
+        {
+            Parameters = parameters;
+            Name = name;
+            Tag = tag;
+            Type = type;
         }
     }
 

@@ -39,9 +39,9 @@ namespace Scythe.Nodes
     {
         public Token name;
         public Expression value;
-        public Token type;
+        public Scythe.Nodes.Type type;
 
-        public VariableDeclStatement(Token name, Expression value, Token type)
+        public VariableDeclStatement(Token name, Expression value, Scythe.Nodes.Type type)
         {
             this.name = name;
             this.value = value;
@@ -81,13 +81,13 @@ namespace Scythe.Nodes
 
     public class FunctionStatement : Statement
     {
-        public Punctuated<(Token Ident, Token Colon, Token Type), Token> parameters;
+        public Punctuated<(Token Ident, Token Colon, Scythe.Nodes.Type Type), Token> parameters;
         public BlockStatement body;
         public Token name;
-        public Token type;
+        public Scythe.Nodes.Type type;
         public bool isVAARG;
 
-        public FunctionStatement(Punctuated<(Token Ident, Token Colon, Token Type), Token> parameters, BlockStatement body, Token name, Token type, bool isvAARG)
+        public FunctionStatement(Punctuated<(Token Ident, Token Colon, Scythe.Nodes.Type Type), Token> parameters, BlockStatement body, Token name, Scythe.Nodes.Type type, bool isvAARG)
         {
             this.parameters = parameters;
             this.body = body;
@@ -121,6 +121,18 @@ namespace Scythe.Nodes
         }
     }
 
+    public class WhileStatement : Statement
+    {
+        public Expression condition;
+        public BlockStatement conditionBlock;
+
+        public WhileStatement(Expression condition, BlockStatement conditionBlock)
+        {
+            this.condition = condition;
+            this.conditionBlock = conditionBlock;
+        }
+    }
+
     public class ExternFunctionStatement : Statement
     {
         public Punctuated<(Token Ident, Token Colon, Token Type), Token> parameters;
@@ -128,6 +140,19 @@ namespace Scythe.Nodes
         public Token type;
 
         public ExternFunctionStatement(Punctuated<(Token Ident, Token Colon, Token Type), Token> parameters, Token name, Token type)
+        {
+            this.parameters = parameters;
+            this.name = name;
+            this.type = type;
+        }
+    }
+    public class TaggedFunctionStatement : Statement
+    {
+        public Punctuated<(Token Ident, Token Colon, Token Type), Token> parameters;
+        public Token name;
+        public Token type;
+
+        public TaggedFunctionStatement(Token tag, Punctuated<(Token Ident, Token Colon, Token Type), Token> parameters, Token name, Token type)
         {
             this.parameters = parameters;
             this.name = name;
@@ -183,10 +208,10 @@ namespace Scythe.Nodes
 
     public class StructStatement : Statement
     {
-        public Punctuated<(Token Ident, Token Colon, Token Type), Token> Variables;
+        public Punctuated<(Token Ident, Token Colon, Scythe.Nodes.Type Type), Token> Variables;
         public Token name;
 
-        public StructStatement(Token _name, Punctuated<(Token Ident, Token Colon, Token Type), Token> variables)
+        public StructStatement(Token _name, Punctuated<(Token Ident, Token Colon, Scythe.Nodes.Type Type), Token> variables)
         {
             Variables = variables;
             name = _name;

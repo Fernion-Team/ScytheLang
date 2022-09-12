@@ -47,20 +47,34 @@ namespace Scythe
             return new BlockStatement(stmts);
         }
 
-        [Rule("type_identifier: (kw_Int|kw_String|kw_Float|kw_Bool|kw_Char|kw_Uint|kw_Void)")]
+        /*[Rule("type_identifier: (kw_Int|kw_String|kw_Float|kw_Bool|kw_Char|kw_Uint|kw_Void)")]
         private static Token typeident(Token ident)
         {
             return ident;
-        }
+        }*/
 
         [Rule("stmt: expr")]
         public static Statement ExpressionStatementF(Expression expr)
         {
             return new ExpressionStatement(expr);
         }
+        
+     
 
-        [Rule("stmt: kw_Function identifier '(' ((identifier ':' type_identifier) (',' (identifier ':' type_identifier))*)? (',' elp_vaa)? ')' bas_rightlook type_identifier block_stmt")]
-        private static Statement FunctionDeclaration(Token _1, Token name, Token _3, Punctuated<(Token Ident, Token Colon, Token Type), Token> parameters, (Token, Token)? vaarg, Token _4, Token _5, Token type, BlockStatement body)
+        [Rule("type: identifier")]
+        public static Scythe.Nodes.Type TypeParse(Token type)
+        {
+            return new IdentifierType(type);
+        }
+
+        [Rule("type: type '*'")]
+        public static Scythe.Nodes.Type PointerTypeParse(Scythe.Nodes.Type type, Token _)
+        {
+            return new PointerType(type);
+        }
+
+        [Rule("stmt: kw_Function identifier '(' ((identifier ':' type) (',' (identifier ':' type))*)? (',' elp_vaa)? ')' bas_rightlook type block_stmt")]
+        private static Statement FunctionDeclaration(Token _1, Token name, Token _3, Punctuated<(Token Ident, Token Colon, Scythe.Nodes.Type Type), Token> parameters, (Token, Token)? vaarg, Token _4, Token _5, Scythe.Nodes.Type type, BlockStatement body)
         {
             bool isvarg = false;
 
@@ -70,14 +84,14 @@ namespace Scythe
             return new FunctionStatement(parameters, body, name, type, isvarg);
         }
 
-        [Rule("stmt: identifier bas_rightlook kw_Struct '{' ((identifier ':' type_identifier) (',' (identifier ':' type_identifier))*)? '}'")]
-        private static Statement StructDecl(Token name, Token _1, Token _2, Token _3, Punctuated<(Token Ident, Token Colon, Token Type), Token> values, Token _4)
+        [Rule("stmt: identifier bas_rightlook kw_Struct '{' ((identifier ':' type) (',' (identifier ':' type))*)? '}'")]
+        private static Statement StructDecl(Token name, Token _1, Token _2, Token _3, Punctuated<(Token Ident, Token Colon, Scythe.Nodes.Type Type), Token> values, Token _4)
         {
             return new StructStatement(name, values);
         }
 
-        [Rule("stmt: kw_Var identifier bas_leftlook expr ':' identifier")]
-        private static Statement VarDeclaration(Token _1, Token name, Token _2, Expression value, Token _3, Token type)
+        [Rule("stmt: kw_Var identifier bas_leftlook expr ':' type")]
+        private static Statement VarDeclaration(Token _1, Token name, Token _2, Expression value, Token _3, Scythe.Nodes.Type type)
         {
             return new VariableDeclStatement(name, value, type);
         }
@@ -106,7 +120,7 @@ namespace Scythe
             return new StrMSetStatement(a, b, c);
         }
 
-        [Rule("stmt: kw_Extern kw_Function identifier '(' ((identifier ':' type_identifier) (',' (identifier ':' type_identifier))*)? ')' bas_rightlook type_identifier")]
+        [Rule("stmt: kw_Extern kw_Function identifier '(' ((identifier ':' identifier) (',' (identifier ':' identifier))*)? ')' bas_rightlook identifier")]
         private static Statement ExtFunctionDeclaration(Token _0, Token _1, Token name, Token _3, Punctuated<(Token Ident, Token Colon, Token Type), Token> parameters, Token _4, Token _5, Token type)
         {
             return new ExternFunctionStatement(parameters, name, type);
@@ -118,7 +132,13 @@ namespace Scythe
             return new IfStatement(expr, stmt);
         }
 
-        [Rule("stmt: '(' type_identifier ')' expr")]
+        [Rule("stmt: kw_While '(' expr ')' block_stmt")]
+        private static Statement WhileStmtt(Token _0, Token _1, Expression expr, Token _2, BlockStatement stmt)
+        {
+            return new WhileStatement(expr, stmt);
+        }
+
+        [Rule("stmt: '(' identifier ')' expr")]
         private static Statement CastStmt(Token _1, Token type, Token _2, Expression expr)
         {
             return new CastStatement(type, expr);
@@ -168,12 +188,22 @@ namespace Scythe
             return new FloatLiteralExpr(literal);
         }
 
+        [Rule("expr: (kw_True|kw_False)")]
+        public static Expression BoolLiteral(Token literal)
+        {
+            return new BoolLiteralExpr(literal);
+        }
+
         [Rule("expr: identifier bas_dot kw_New")]
         public static Expression CreateStructObject(Token strName, Token _1, Token _2)
         {
             return new NewObjectExpression(strName);
         }
-
         
+        [Rule("expr: '*'expr")]
+        public static Expression Pointer(Token _1, Expression expr)
+        {
+            return new PointerExpr(expr);
+        }
     }
 }

@@ -49,6 +49,42 @@ namespace Scythe.Nodes
         }
     }
 
+    public class PointerExpr : Expression
+    {
+        public Expression elem;
+
+        public PointerExpr(Expression elem)
+        {
+            this.elem = elem;
+        }
+    }
+
+    public class IdentifierType : Type
+    {
+        public Token typeToken;
+
+        public IdentifierType(Token typeToken)
+        {
+            this.typeToken = typeToken;
+        }
+    }
+
+    public class PointerType : Type
+    {
+        public Type type;
+
+        public PointerType(Type type)
+        {
+            this.type = type;
+        }
+    }
+
+    public abstract class Type
+    {
+
+    }
+    
+
     public class NewObjectExpression : Expression
     {
         public Token structName;
@@ -75,6 +111,16 @@ namespace Scythe.Nodes
         public Token literal;
 
         public IntLiteralExpr(Token literal)
+        {
+            this.literal = literal;
+        }
+    }
+
+    public class BoolLiteralExpr : Expression
+    {
+        public Token literal;
+
+        public BoolLiteralExpr(Token literal)
         {
             this.literal = literal;
         }
