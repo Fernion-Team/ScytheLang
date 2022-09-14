@@ -2,7 +2,9 @@
   "profiles": {
     "Scythe": {
       "commandName": "Project",
-      "commandLineArgs": "build test.sy app --nat --modules io.bc"
+      "commandLineArgs": "build -dbg",
+      "workingDirectory": "C:\\Users\\bitte\\source\\repos\\Scythe\\Scythe\\bin\\Debug\\net6.0\\win-x64\\TestStrDBG",
+      "nativeDebugging": true
     }
   }
 }

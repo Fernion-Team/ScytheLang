@@ -237,9 +237,9 @@ namespace Scythe.Nodes.Bound
     {
         public List<Parameter> Parameters;
         public string Name;
-        public Scythe.Symbols.DataType Type;
+        public BoundType Type;
 
-        public BoundExternFunctionStatement(List<Parameter> parameters, string name, DataType type)
+        public BoundExternFunctionStatement(List<Parameter> parameters, string name, BoundType type)
         {
             Parameters = parameters;
             Name = name;

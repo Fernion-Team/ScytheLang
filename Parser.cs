@@ -120,8 +120,9 @@ namespace Scythe
             return new StrMSetStatement(a, b, c);
         }
 
-        [Rule("stmt: kw_Extern kw_Function identifier '(' ((identifier ':' identifier) (',' (identifier ':' identifier))*)? ')' bas_rightlook identifier")]
-        private static Statement ExtFunctionDeclaration(Token _0, Token _1, Token name, Token _3, Punctuated<(Token Ident, Token Colon, Token Type), Token> parameters, Token _4, Token _5, Token type)
+        // TO-DO: Rename to function prototype.
+        [Rule("stmt: kw_Function identifier '(' ((identifier ':' type) (',' (identifier ':' type))*)? ')' bas_rightlook type")]
+        private static Statement ExtFunctionDeclaration(Token _1, Token name, Token _3, Punctuated<(Token Ident, Token Colon, Scythe.Nodes.Type Type), Token> parameters, Token _4, Token _5, Scythe.Nodes.Type type)
         {
             return new ExternFunctionStatement(parameters, name, type);
         }

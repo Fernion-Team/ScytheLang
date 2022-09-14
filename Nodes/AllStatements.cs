@@ -135,11 +135,11 @@ namespace Scythe.Nodes
 
     public class ExternFunctionStatement : Statement
     {
-        public Punctuated<(Token Ident, Token Colon, Token Type), Token> parameters;
+        public Punctuated<(Token Ident, Token Colon, Scythe.Nodes.Type Type), Token> parameters;
         public Token name;
-        public Token type;
+        public Scythe.Nodes.Type type;
 
-        public ExternFunctionStatement(Punctuated<(Token Ident, Token Colon, Token Type), Token> parameters, Token name, Token type)
+        public ExternFunctionStatement(Punctuated<(Token Ident, Token Colon, Scythe.Nodes.Type Type), Token> parameters, Token name, Scythe.Nodes.Type type)
         {
             this.parameters = parameters;
             this.name = name;

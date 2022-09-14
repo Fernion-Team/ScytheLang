@@ -366,7 +366,15 @@ partial class Program
 
                         foreach (var node in Binder.Bind(listRes))
                         {
-                            CGV.Visit(node);
+                            try
+                            {
+                                CGV.Visit(node);
+                            }
+                            catch
+                            {
+                                if (leaveLL)
+                                    LLVM.DumpModule(module);
+                            }
                         }
 
                         sbyte* error;

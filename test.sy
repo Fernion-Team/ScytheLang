@@ -8,5 +8,5 @@
 
 fn main() -> void
 {
-    printd(fib(7));
+    print("Hello, %s", "world");
 }

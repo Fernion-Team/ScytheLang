@@ -82,6 +82,17 @@ namespace Scythe.Nodes.Bound
         }
     }
 
+    public class BoundBoolLiteralExpr : BoundExpression
+    {
+        public int Literal;
+
+        public BoundBoolLiteralExpr(int literal)
+        {
+            Literal = literal;
+        }
+    }
+
+
     public class BoundFloatLiteralExpr : BoundExpression
     {
         public float Literal;

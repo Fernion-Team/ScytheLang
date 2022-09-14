@@ -56,6 +56,7 @@ namespace Scythe.CodeGen
             BoundStructMVExpr => VisitStructMVExpr(expr as BoundStructMVExpr),
             BoundNewObjectExpression => VisitNewObj(expr as BoundNewObjectExpression),
             BoundPointerExpr => VisitValuePointer(expr as BoundPointerExpr),
+            BoundBoolLiteralExpr => VisitBoolLiteral(expr as BoundBoolLiteralExpr),
             _ => throw new Exception("[FATAL]: Expression that was attempted to be visited is invalid/unknown. '" + expr + "'."),
         };
 
@@ -123,15 +124,25 @@ namespace Scythe.CodeGen
                 var memberVar = sym.Members.Single(e => e.Name == stmt.b);
                 // get it's GEP index
                 var gepIndex = sym.Members.IndexOf(memberVar);
-
+                Console.WriteLine(theName+" "+memberVar + " : " + gepIndex +" : "+strobj+" : "+stmt.a);
                 // build the GEP
-                var GEP = LLVM.BuildStructGEP(builder, strobj, (uint)gepIndex, Helpers.StrToSByte("struct_gep_" + theName));
+                try
+                {
 
-                // visit the set value expression
-                this.Visit(stmt.c);
 
-                // make a store
-                LLVM.BuildStore(builder, valueStack.Pop(), GEP);
+                    Console.WriteLine(module.PrintToString());
+                    Console.WriteLine(strobj);
+                    var GEP = LLVM.BuildStructGEP(builder, strobj, (uint)gepIndex, StrToSByte("struct_gep")); /*LLVM.BuildStructGEP(builder, strobj, (uint)gepIndex, StrToSByte("struct_gep_" + theName));*/
+                        //visit the set value expression
+                    this.Visit(stmt.c);
+                
+                        //make a store
+                    LLVM.BuildStore(builder, valueStack.Pop(), GEP);
+                }
+                catch(AccessViolationException e)
+                {
+                        
+                }
             }
             else
             {
@@ -170,6 +181,12 @@ namespace Scythe.CodeGen
         {
 
             valueStack.Push(LLVM.ConstInt(LLVM.Int32Type(), (ulong)expr.Literal, 1));
+            return expr;
+        }
+
+        public unsafe BoundExpression VisitBoolLiteral(BoundBoolLiteralExpr expr)
+        {
+            valueStack.Push(LLVM.ConstInt(LLVM.Int1Type(), (ulong)expr.Literal, 0));
             return expr;
         }
 
@@ -247,6 +264,8 @@ namespace Scythe.CodeGen
             // get the name of the struct type.
             var x = LLVM.PrintTypeToString(strType);
 
+            Console.WriteLine(expr.strName);
+
             var theName = Helpers.SByteToStr(x);
             theName = theName.Replace("%", "");
             theName = theName.Replace("*", "");
@@ -261,6 +280,8 @@ namespace Scythe.CodeGen
                 var memberVar = sym.Members.Single(e => e.Name == expr.mvName);
                 // get it's GEP index
                 var gepIndex = sym.Members.IndexOf(memberVar);
+
+                Console.WriteLine(memberVar+ " : " + gepIndex);
 
                 var GEP = LLVM.BuildStructGEP(builder, strobj, (uint)gepIndex, StrToSByte("struct_member_gep_" + theName));
 
@@ -292,12 +313,7 @@ namespace Scythe.CodeGen
             Operator.NOT => LLVMIntPredicate.LLVMIntNE,
             Operator.EQ => LLVMIntPredicate.LLVMIntEQ,
             _ => throw new Exception("Unknown Operator.")
-        };
-
-        // make an operating system kernel in C#
-        
-       
-        
+        };       
 
         public unsafe BoundStatement VisitIfStmt(BoundIfStatement stmt)
         {
@@ -425,7 +441,7 @@ namespace Scythe.CodeGen
                     case DataType.Float:
                         return LLVM.FloatType();
                     case DataType.Uint:
-                        return LLVM.Int32Type();
+                        return LLVM.Int8Type();
                     case DataType.Bool:
                         return LLVM.Int1Type();
                     case DataType.String:
@@ -526,6 +542,11 @@ namespace Scythe.CodeGen
         /// <returns></returns>
         public unsafe BoundStatement VisitFunctionExtern(BoundExternFunctionStatement stmt)
         {
+            fixed (LLVMOpaqueType** prTypes = ParameterTypes(stmt.Parameters))
+            {
+                LLVM.AddFunction(this.module, StrToSByte(stmt.Name), LLVM.FunctionType(UnwrapType(stmt.Type), prTypes, (uint)stmt.Parameters.Count, 0));
+            }
+
             return stmt;
         }
 
@@ -552,11 +573,15 @@ namespace Scythe.CodeGen
                             callee = LLVM.AddFunction(mod, StrToSByte("printf"), LLVM.FunctionType(LLVM.Int32Type(), pptr, 1, 1));
                     }
                 }
+                else
+                {
+                    throw new Exception("Function to be called, does not exist.");
+                }
             }
 
             //Console.WriteLine("Calling: " + expr.Name);
             //module.Dump();
-            if (LLVM.CountParams(callee) != expr.Arguments.Count)
+            if (LLVM.IsFunctionVarArg(LLVM.TypeOf(callee)) == 1 && LLVM.CountParams(callee) != expr.Arguments.Count)
             {
                 throw new Exception("Incorrect number of arguments passed.");
             }
@@ -585,7 +610,12 @@ namespace Scythe.CodeGen
 
             var strType = LLVM.StructCreateNamed(ctx, Helpers.StrToSByte(stmt.Name));
 
+          
+            
+
             symbolTable.Add(stmt.Name, new StructSymbol(stmt.Name, stmt.Variables));
+
+            
 
             structTypes.Add(stmt.Name, strType);
 
@@ -595,7 +625,16 @@ namespace Scythe.CodeGen
             {
                 LLVM.StructSetBody(strType, pptr, (uint)fx.Length, 0);
             }
+            var x = LLVM.PrintTypeToString(strType);
 
+            var theName = Helpers.SByteToStr(x);
+            theName = theName.Replace("%", "");
+            theName = theName.Replace("*", "");
+
+
+            Console.WriteLine(theName);
+            symbolTable.Add(theName, new StructSymbol(stmt.Name, stmt.Variables));
+            structTypes.Add(theName, strType);
             return stmt;
         }
 

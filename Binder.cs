@@ -122,7 +122,7 @@ namespace Scythe
                     var Floatlit = expr as FloatLiteralExpr;
                     return new BoundFloatLiteralExpr(float.Parse(Floatlit.literal.Text));
                 case BoolLiteralExpr:
-                    return new BoundIntLiteralExpr((expr as BoolLiteralExpr).literal.Text == "true" ? 1 : 0);
+                    return new BoundBoolLiteralExpr((expr as BoolLiteralExpr).literal.Text == "true" ? 1 : 0);
                 case StringLiteralExpr:
                     var strlit = expr as StringLiteralExpr;
                     return new BoundStringLiteralExpr(strlit.literal.Text.Replace("\"",""));
@@ -224,9 +224,9 @@ namespace Scythe
                     case VariableSetStatement:
                         allStmts.Add(new BoundVariableSetStatement((x as VariableSetStatement).a.Text, BindExpression((x as VariableSetStatement).b)));
                         break;
-                    /*case ExternFunctionStatement:
-                        allStmts.Add(new BoundExternFunctionStatement(BindParams((x as ExternFunctionStatement).parameters), (x as ExternFunctionStatement).name.Text, DecideType((x as ExternFunctionStatement).type.Text).Value));
-                        break;*/
+                    case ExternFunctionStatement:
+                        allStmts.Add(new BoundExternFunctionStatement(BindParams((x as ExternFunctionStatement).parameters), (x as ExternFunctionStatement).name.Text, BindType((x as ExternFunctionStatement).type)));
+                        break;
                     case CastStatement:
                         allStmts.Add(new BoundCastStatement(DecideType((x as CastStatement).dataType.Text).Value, BindExpression((x as CastStatement).expression)));
                         break;
